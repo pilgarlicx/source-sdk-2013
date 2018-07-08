@@ -770,6 +770,9 @@ static void SetClearColorToFogColor()
 #ifdef HL2_CLIENT_DLL
 CLIENTEFFECT_REGISTER_BEGIN( PrecacheViewRender )
 	CLIENTEFFECT_MATERIAL( "scripted/intro_screenspaceeffect" )
+
+	// vignette addition
+	CLIENTEFFECT_MATERIAL("pp/vignette")
 CLIENTEFFECT_REGISTER_END()
 #endif
 
@@ -6261,3 +6264,27 @@ void CRefractiveGlassView::Draw()
 	pRenderContext->ClearColor4ub( 0, 0, 0, 255 );
 	pRenderContext->Flush();
 }
+
+// VIGNETTE START
+static void DrawVignette(void)
+{
+	IMaterial *pMaterial = materials->FindMaterial("pp/vignette", TEXTURE_GROUP_OTHER, true);
+
+	{
+		static bool bDisplayed = false;
+
+		if (bDisplayed)
+		{
+			view->SetScreenOverlayMaterial(NULL);
+		}
+		else
+		{
+			view->SetScreenOverlayMaterial(pMaterial);
+		}
+
+		bDisplayed = !bDisplayed;
+	}
+}
+
+static ConCommand toggle_vignette("toggle_vignette", DrawVignette);
+// VIGNETTE END

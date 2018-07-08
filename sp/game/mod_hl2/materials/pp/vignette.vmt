@@ -1,0 +1,7 @@
+"Post_Vignette"
+{
+	"$basetexture" "_rt_FullFrameFB"
+	"$vopacity" 1.5
+	"$vinnerradius" 0.1
+	"$vouterradius" 1.0
+}

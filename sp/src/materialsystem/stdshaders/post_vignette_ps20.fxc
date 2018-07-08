@@ -1,0 +1,33 @@
+/*
+
+Copyright 2018 Highflex
+All rights reserved.
+
+Vignette Code Shader HLSL Source
+
+*/
+
+#include "common_ps_fxc.h"
+
+/* defined in vmt file
+#define innerRadius 0.1
+#define outerRadius 1.0
+#define opacity 3.0
+*/
+
+const HALF opacity : register (c0);
+const HALF innerRadius : register (c1);
+const HALF outerRadius : register (c2);
+
+sampler BaseTextureSampler : register( s0 );
+
+HALF4 main(float2 iTexCoord : TEXCOORD0) : COLOR //out main function
+{
+    float2 center = iTexCoord.xy - 0.5;
+	float4 image = tex2D(BaseTextureSampler,iTexCoord.xy);
+    float4 color = float4(1.0, 1.0, 1.0, 1.0);
+    color.rgb *= 1.0 - smoothstep(innerRadius, outerRadius, length(center));
+    color *= image;
+    color = lerp(image, color, opacity);
+	return color;
+}
