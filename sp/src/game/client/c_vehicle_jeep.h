@@ -53,7 +53,7 @@ private:
 
 	Vector		m_vecLastEyePos;
 	Vector		m_vecLastEyeTarget;
-	Vector		m_vecEyeSpeed;
+	
 	Vector		m_vecTargetSpeed;
 
 	float		m_flViewAngleDeltaTime;
@@ -61,6 +61,13 @@ private:
 	float		m_flJeepFOV;
 	CHeadlightEffect *m_pHeadlight;
 	bool		m_bHeadlightIsOn;
+
+
+	// ALEX VIGNETTE MERGE START
+public:
+	// move to public, because we need to read the velocity speed
+	Vector		m_vecEyeSpeed;
+	// ALEX VIGNETTE END
 };
 
 #endif // C_VEHICLE_JEEP_H

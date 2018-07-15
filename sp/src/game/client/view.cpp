@@ -307,6 +307,13 @@ void CViewRender::Init( void )
 	extern CMaterialReference g_material_WriteZ;
 	g_material_WriteZ.Init( "engine/writez", TEXTURE_GROUP_OTHER );
 
+	// ALEX VIGNETTE MERGE START
+
+	// make sure to init the vignette
+	InitVignetteMaterial();
+
+	// ALEX VIGNETTE END
+
 	// FIXME:  
 	QAngle angles;
 	engine->GetViewAngles( angles );

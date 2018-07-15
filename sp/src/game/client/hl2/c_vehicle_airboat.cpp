@@ -122,7 +122,7 @@ private:
 
 	Vector		m_vecLastEyePos;
 	Vector		m_vecLastEyeTarget;
-	Vector		m_vecEyeSpeed;
+
 	Vector		m_vecTargetSpeed;
 
 	float		m_flViewAngleDeltaTime;
@@ -142,6 +142,12 @@ private:
 	CMeshBuilder	m_Mesh;
 
 	Vector			m_vecPhysVelocity;
+
+	// ALEX VIGNETTE MERGE START
+public:
+	// move to public, because we need to read the velocity speed
+	Vector		m_vecEyeSpeed;
+	// ALEX VIGNETTE END
 };
 
 IMPLEMENT_CLIENTCLASS_DT( C_PropAirboat, DT_PropAirboat, CPropAirboat )

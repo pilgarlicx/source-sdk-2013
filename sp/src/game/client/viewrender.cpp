@@ -77,6 +77,16 @@
 // Projective textures
 #include "C_Env_Projected_Texture.h"
 
+
+// ALEX VIGNETTE MERGE START
+
+// get all vehicle related entities
+#include "iclientvehicle.h"
+#include "c_vehicle_jeep.h"
+// ALEX VIGNETTE END
+
+
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -171,6 +181,22 @@ static ConVar pyro_dof( "pyro_dof", "1", FCVAR_ARCHIVE );
 extern ConVar cl_leveloverview;
 
 extern ConVar localplayer_visionflags;
+
+
+// ALEX VIGNETTE MERGE START
+
+ConVar r_vignette_draw("r_vignette_draw", "0", FCVAR_ARCHIVE, "0=Off, 1=On - Draw Vignette to help with Motion Sickness");
+ConVar r_vignette_move_blendtime("r_vignette_move_blendtime", "7.0f", FCVAR_ARCHIVE, "Controls how fast the Vignette interpolates between Movement States");
+ConVar r_vignette_special_blendtime("r_vignette_special_blendtime", "10.0f", FCVAR_ARCHIVE, "Controls how fast the Vignette interpolates between Special States such as Snap Turning / Teleporting");
+
+// tweakable variables per special case
+ConVar r_vignette_stand_opacity("r_vignette_stand_opacity", "1.5f", FCVAR_ARCHIVE, "The Opacity of the Vignette when standing still");
+ConVar r_vignette_walk_opacity("r_vignette_walk_opacity", "3.5f", FCVAR_ARCHIVE, "The Opacity of the Vignette when walking");
+ConVar r_vignette_run_opacity("r_vignette_run_opacity", "4.0f", FCVAR_ARCHIVE, "The Opacity of the Vignette when running");
+ConVar r_vignette_vehicle_move_opacity("r_vignette_vehicle_move_opacity", "4.5f", FCVAR_ARCHIVE, "The Opacity of the Vignette when moving in vehicles");
+ConVar r_vignette_teleport_opacity("r_vignette_teleport_opacity", "3.5f", FCVAR_ARCHIVE, "The Opacity of the Vignette when teleporting");
+
+// ALEX VIGNETTE END
 
 //-----------------------------------------------------------------------------
 // Globals
@@ -2061,6 +2087,12 @@ void CViewRender::RenderView( const CViewSetup &view, int nClearFlags, int whatT
 		IMaterial* pMaterial = blend ? m_ModulateSingleColor : m_TranslucentSingleColor;
 		render->ViewDrawFade( color, pMaterial );
 		PerformScreenOverlay( view.x, view.y, view.width, view.height );
+
+
+		// ALEX VIGNETTE MERGE START
+		PerformVignetteOverlay(view.x, view.y, view.width, view.height);
+		// ALEX VIGNETTE END
+
 
 		// Prevent sound stutter if going slow
 		engine->Sound_ExtraUpdate();	
@@ -6265,7 +6297,9 @@ void CRefractiveGlassView::Draw()
 	pRenderContext->Flush();
 }
 
-// VIGNETTE START
+// ALEX VIGNETTE MERGE START
+
+/*
 static void DrawVignette(void)
 {
 	IMaterial *pMaterial = materials->FindMaterial("pp/vignette", TEXTURE_GROUP_OTHER, true);
@@ -6287,4 +6321,173 @@ static void DrawVignette(void)
 }
 
 static ConCommand toggle_vignette("toggle_vignette", DrawVignette);
-// VIGNETTE END
+*/
+
+//-----------------------------------------------------------------------------
+// Purpose: Init the Vignette material (can't be done during rendering)
+//-----------------------------------------------------------------------------
+void CViewRender::InitVignetteMaterial()
+{
+	// hardcode the vignette material for now here
+	pVignetteMaterial = materials->FindMaterial("pp/vignette", TEXTURE_GROUP_OTHER, true);
+	m_VignetteOverlayMaterialRef.Init(pVignetteMaterial);
+}
+
+//-----------------------------------------------------------------------------
+// 
+//-----------------------------------------------------------------------------
+IMaterial *CViewRender::GetVignetteMaterial()
+{
+	return m_VignetteOverlayMaterialRef;
+}
+
+#define SMALL_NUMBER		(1.e-8f)
+
+//-----------------------------------------------------------------------------
+// simple utility function for linear interpolation
+//-----------------------------------------------------------------------------
+float CViewRender::FInterpTo(float Current, float Target, float DeltaTime, float InterpSpeed)
+{
+	// If no interp speed, jump to target value
+	if (InterpSpeed <= 0.f)
+	{
+		return Target;
+	}
+
+	// Distance to reach
+	const float Dist = Target - Current;
+
+	// If distance is too small, just set the desired location
+	if (Square(Dist) < SMALL_NUMBER)
+	{
+		return Target;
+	}
+
+	// Delta Move, Clamp so we do not over shoot.
+	const float DeltaMove = Dist * clamp(DeltaTime * InterpSpeed, 0.f, 1.f);
+
+	return Current + DeltaMove;
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Renders vignette on screen
+//-----------------------------------------------------------------------------
+void CViewRender::PerformVignetteOverlay(int x, int y, int w, int h)
+{
+	VPROF("CViewRender::PerformVignetteOverlay()");
+
+	// check against convar to not render if not desired to
+	if (!r_vignette_draw.GetBool())
+	{
+		return;
+	}
+
+	if (m_VignetteOverlayMaterialRef)
+	{
+		tmZone(TELEMETRY_LEVEL0, TMZF_NONE, "%s", __FUNCTION__);
+
+		if (m_VignetteOverlayMaterialRef->NeedsFullFrameBufferTexture())
+		{
+			// FIXME: check with multi/sub-rect renders. Should this be 0,0,w,h instead?
+			DrawScreenEffectMaterial(m_VignetteOverlayMaterialRef, x, y, w, h);
+		}
+		else if (m_VignetteOverlayMaterialRef->NeedsPowerOfTwoFrameBufferTexture())
+		{
+			// First copy the FB off to the offscreen texture
+			UpdateRefractTexture(x, y, w, h, true);
+
+			// Now draw the entire screen using the material...
+			CMatRenderContextPtr pRenderContext(materials);
+			ITexture *pTexture = GetPowerOfTwoFrameBufferTexture();
+			int sw = pTexture->GetActualWidth();
+			int sh = pTexture->GetActualHeight();
+			// Note - don't offset by x,y - already done by the viewport.
+			pRenderContext->DrawScreenSpaceRectangle(m_VignetteOverlayMaterialRef, 0, 0, w, h,
+				0, 0, sw - 1, sh - 1, sw, sh);
+		}
+		else
+		{
+			byte color[4] = { 255, 255, 255, 255 };
+			render->ViewDrawFade(color, m_VignetteOverlayMaterialRef);
+		}
+
+		// handle modifying the material parameters at runtime
+
+		// get player
+		C_BasePlayer *pPlayer = C_BasePlayer::GetLocalPlayer();
+
+		if (pPlayer)
+		{
+			// find the parameter to modify
+			bool bVignetteOpacityFound;
+			IMaterialVar*	pMaterialVignetteOpacityVar;
+			pMaterialVignetteOpacityVar = pVignetteMaterial->FindVar("$vopacity", &bVignetteOpacityFound);
+
+			// find the settings from the convars
+			float StandOpacity = r_vignette_stand_opacity.GetFloat();
+			float WalkOpacity = r_vignette_walk_opacity.GetFloat();
+			float VehicleMoveOpacity = r_vignette_vehicle_move_opacity.GetFloat();
+
+			// get blend speed
+			float VignBlendTime = r_vignette_move_blendtime.GetFloat();
+
+			//InterpolateVector
+
+			// figure out if the player is in a vehicle first
+			if (pPlayer->IsInAVehicle())
+			{
+				// get the vehicle of the player				
+				CBaseEntity *pVehicleEnt = pPlayer->GetVehicle()->GetVehicleEnt();
+
+				if(pVehicleEnt)
+				{
+					// cast to airboat and jeep
+					C_PropJeep* pJeep = static_cast<C_PropJeep*>(pVehicleEnt);
+
+					// airboat is one single cpp file needs probably splitting to be properly casted and work here :(
+					//C_PropAirboat* pAirboat = static_cast<C_PropAirboat*>(pVehicleEnt);
+
+					if (pJeep)
+					{
+						// vehicle velocity is stored under this
+						float CurVehVelSpeed = pJeep->m_vecEyeSpeed.Length2D();
+						//Msg("Jeep Speed is: %.2f \n", CurVehVelSpeed);
+
+						// vehicle movement
+						if (CurVehVelSpeed > 25.0f)
+						{
+							CurrentVignetteOpacity = FInterpTo(CurrentVignetteOpacity, VehicleMoveOpacity, gpGlobals->frametime, VignBlendTime);
+						}
+						else
+						{
+							CurrentVignetteOpacity = FInterpTo(CurrentVignetteOpacity, StandOpacity, gpGlobals->frametime, VignBlendTime);
+						}
+					}					
+				}
+			}
+			else
+			{
+				float CurVelocitySpeed = pPlayer->GetAbsVelocity().Length2D();
+
+				// on foot branch
+				if (CurVelocitySpeed > 0.0f)
+				{
+					CurrentVignetteOpacity = FInterpTo(CurrentVignetteOpacity, WalkOpacity, gpGlobals->frametime, VignBlendTime);
+				}
+				else
+				{
+					CurrentVignetteOpacity = FInterpTo(CurrentVignetteOpacity, StandOpacity, gpGlobals->frametime, VignBlendTime);
+				}
+			}
+
+			// set from current opacity value
+			pMaterialVignetteOpacityVar->SetFloatValue(CurrentVignetteOpacity);
+		}
+
+	}
+}
+
+
+
+// ALEX VIGNETTE END

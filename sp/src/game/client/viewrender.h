@@ -523,6 +523,18 @@ private:
 #if defined( REPLAY_ENABLED )
 	CReplayScreenshotTaker	*m_pReplayScreenshotTaker;
 #endif
+
+	// ALEX VIGNETTE MERGE START
+public:
+	float CurrentVignetteOpacity;
+	float FInterpTo(float Current, float Target, float DeltaTime, float InterpSpeed);
+
+	IMaterial* pVignetteMaterial;
+	CMaterialReference	m_VignetteOverlayMaterialRef;
+	void			InitVignetteMaterial();
+	IMaterial		*GetVignetteMaterial();
+	void			PerformVignetteOverlay(int x, int y, int w, int h);
+	// ALEX VIGNETTE END
 };
 
 #endif // VIEWRENDER_H
